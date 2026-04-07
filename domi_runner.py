@@ -32,7 +32,7 @@ def analyze_assets():
         df = get_kraken_data(ticker)
         if df is None: continue
         
-        # MAs
+        # Calculate MAs
         df['ma20'] = df['close'].rolling(20).mean()
         df['ma50'] = df['close'].rolling(50).mean()
         df['ma100'] = df['close'].rolling(100).mean()
@@ -41,25 +41,34 @@ def analyze_assets():
         price = df['close'].iloc[-1]
         momentum = price - df['close'].iloc[-2]
         
+        # Priority Logic: Find the CLOSEST MA to price
+        best_ma = None
+        min_diff = 100 # placeholder high number
+
         for ma in [20, 50, 100, 200]:
             ma_val = df[f'ma{ma}'].iloc[-1]
-            diff = ((price - ma_val) / ma_val) * 100
+            diff = abs(((price - ma_val) / ma_val) * 100)
             
-            # THE VIP LOGIC: If price is crossing UP through MA = BUY. If crossing DOWN = SELL.
-            if abs(diff) < 0.8:
-                hits += 1
-                status = "🟢 BUY / LONG" if momentum > 0 else "🔴 SELL / SHORT"
-                strength = "HIGH" if abs(momentum) > (price * 0.001) else "STABLE"
-                
-                body += f"💎 ASSET: {name}\n"
-                body += f"💰 PRICE: ${price:,.4f}\n"
-                body += f"🎯 SIGNAL: {status}\n"
-                body += f"📊 LEVEL: {ma}MA Cross\n"
-                body += f"⚡️ MOMENTUM: {strength}\n"
-                body += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            # Check if this MA is currently being touched/crossed (under 0.8%)
+            if diff < 0.8 and diff < min_diff:
+                min_diff = diff
+                best_ma = ma
+        
+        # If we found a valid MA cross/touch, build the one box for this asset
+        if best_ma:
+            hits += 1
+            status = "🟢 BUY / LONG" if momentum > 0 else "🔴 SELL / SHORT"
+            strength = "HIGH" if abs(momentum) > (price * 0.001) else "STABLE"
+            
+            body += f"💎 ASSET: {name}\n"
+            body += f"💰 PRICE: ${price:,.4f}\n"
+            body += f"🎯 SIGNAL: {status}\n"
+            body += f"📊 LEVEL: {best_ma}MA Cross\n"
+            body += f"⚡️ MOMENTUM: {strength}\n"
+            body += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
         
     if hits == 0:
-        return None # Only send if there is a real play
+        return None 
     return header + body
 
 def send_telegram(message):
@@ -67,7 +76,7 @@ def send_telegram(message):
     token = os.getenv('TELEGRAM_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     requests.post(f"https://api.telegram.org/bot{token}/sendMessage", 
-                  data={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+                  data={'chat_id': chat_id, 'text': message})
 
 if __name__ == "__main__":
     report = analyze_assets()
