@@ -3,72 +3,68 @@ import requests
 import pandas as pd
 import numpy as np
 
-WATCHLIST = {
-    "BTC": "XXBTZUSD",
-    "XRP": "XRPUSD",
-    "XLM": "XLMUSD",
-    "ZBCN": "ZBCNUSD",
-    "JASMY": "JASMYUSD"
-}
+WATCHLIST = {"BTC": "XXBTZUSD", "XRP": "XRPUSD", "XLM": "XLMUSD", "ZBCN": "ZBCNUSD", "JASMY": "JASMYUSD"}
 
-def get_kraken_data(pair, interval=60):
-    url = f"https://api.kraken.com/0/public/OHLC?pair={pair}&interval={interval}"
+def get_kraken_data(pair):
+    url = f"https://api.kraken.com/0/public/OHLC?pair={pair}&interval=60"
     try:
         resp = requests.get(url).json()
         data_key = list(resp['result'].keys())[0]
-        data = resp['result'][data_key]
-        df = pd.DataFrame(data, columns=['ts', 'open', 'high', 'low', 'close', 'vwap', 'vol', 'count'])
+        df = pd.DataFrame(resp['result'][data_key], columns=['ts', 'open', 'high', 'low', 'close', 'vwap', 'vol', 'count'])
         df['close'] = df['close'].astype(float)
         return df
     except: return None
 
 def analyze_assets():
-    header = "⚡️ SNIPER813PRO | DOMI INTELLIGENCE ⚡️\n"
-    header += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    body = ""
-    hits = 0
+    report = "🦅 SNIPER813PRO | CROSSOVER RADAR 🦅\n"
+    report += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    found = False
+    
+    mas = [20, 50, 100, 200]
 
     for name, ticker in WATCHLIST.items():
         df = get_kraken_data(ticker)
         if df is None: continue
         
-        # MAs
-        df['ma20'] = df['close'].rolling(20).mean()
-        df['ma50'] = df['close'].rolling(50).mean()
-        df['ma100'] = df['close'].rolling(100).mean()
-        df['ma200'] = df['close'].rolling(200).mean()
+        # Calculate all MA levels
+        for m in mas:
+            df[f'ma{m}'] = df['close'].rolling(m).mean()
         
         price = df['close'].iloc[-1]
-        momentum = price - df['close'].iloc[-2]
         
-        for ma in [20, 50, 100, 200]:
-            ma_val = df[f'ma{ma}'].iloc[-1]
-            diff = ((price - ma_val) / ma_val) * 100
-            
-            # THE VIP LOGIC: If price is crossing UP through MA = BUY. If crossing DOWN = SELL.
-            if abs(diff) < 0.8:
-                hits += 1
-                status = "🟢 BUY / LONG" if momentum > 0 else "🔴 SELL / SHORT"
-                strength = "HIGH" if abs(momentum) > (price * 0.001) else "STABLE"
+        # Check every combination (20vs50, 50vs200, etc.)
+        for i in range(len(mas)):
+            for j in range(i + 1, len(mas)):
+                ma_fast = mas[i]
+                ma_slow = mas[j]
                 
-                body += f"💎 ASSET: {name}\n"
-                body += f"💰 PRICE: ${price:,.4f}\n"
-                body += f"🎯 SIGNAL: {status}\n"
-                body += f"📊 LEVEL: {ma}MA Cross\n"
-                body += f"⚡️ MOMENTUM: {strength}\n"
-                body += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                val_fast = df[f'ma{ma_fast}'].iloc[-1]
+                val_slow = df[f'ma{ma_slow}'].iloc[-1]
+                
+                # Check for "The Squeeze" (within 0.5% of each other)
+                diff = abs(val_fast - val_slow) / val_slow * 100
+                
+                if diff < 0.5:
+                    found = True
+                    # Determine Trend
+                    trend = "🚀 BULLISH CHARGE" if val_fast > val_slow else "💀 BEARISH DROP"
+                    
+                    report += f"💎 ASSET: {name}\n"
+                    report += f"⚔️ CROSS: {ma_fast}MA x {ma_slow}MA\n"
+                    report += f"🎯 STATUS: {trend}\n"
+                    report += f"💰 PRICE: ${price:,.4f}\n"
+                    report += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
         
-    if hits == 0:
-        return None # Only send if there is a real play
-    return header + body
+    return report if found else None
 
 def send_telegram(message):
     if not message: return
     token = os.getenv('TELEGRAM_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     requests.post(f"https://api.telegram.org/bot{token}/sendMessage", 
-                  data={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
+                  data={'chat_id': chat_id, 'text': message})
 
 if __name__ == "__main__":
-    report = analyze_assets()
-    send_telegram(report)
+    print("SNIPER813PRO SCANNING...")
+    output = analyze_assets()
+    send_telegram(output)
