@@ -1,0 +1,20 @@
+name: DOMI Autonomous Execution
+on:
+  schedule:
+    - cron: '0 * * * *'       # Runs every hour
+  workflow_dispatch:          # Allows manual testing
+jobs:
+  run-domi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Execute DOMI
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python domi_runner.py
