@@ -2,7 +2,6 @@ import os
 import requests
 import pandas as pd
 import numpy as np
-import tweepy
 
 # SNIPER813PRO Global Config
 WATCHLIST = {"BTC": "XXBTZUSD", "XRP": "XRPUSD", "XLM": "XLMUSD", "ZBCN": "ZBCNUSD", "JASMY": "JASMYUSD"}
