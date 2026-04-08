@@ -3,22 +3,23 @@ import requests
 import pandas as pd
 import numpy as np
 
-# --- SYSTEM CONFIG (Pulled from GitHub Secrets) ---
+# --- SYSTEM CONFIG (GitHub Secrets) ---
 KRAKEN_LINK = os.getenv('KRAKEN_REF_LINK')
 TG_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TG_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# Watchlist: Added Institutional ETFs
+# Watchlist: Added Wall Street ETFs
 WATCHLIST = {
     "BTC": "XXBTZUSD", 
     "XRP": "XRPUSD", 
     "ZBCN": "ZBCNUSD", 
     "JASMY": "JASMYUSD",
     "GBTC": "GBTC",      # Grayscale Bitcoin Trust
-    "IBIT": "IBIT"       # iShares Bitcoin Trust
+    "IBIT": "IBIT"       # iShares Bitcoin Trust (BlackRock)
 }
 
 def get_kraken_data(pair, interval=60):
+    # Kraken API handles xStocks/ETFs via the same OHLC endpoint
     url = f"https://api.kraken.com/0/public/OHLC?pair={pair}&interval={interval}"
     try:
         resp = requests.get(url, timeout=10).json()
@@ -42,7 +43,7 @@ def analyze_assets():
         if df_1h is None or df_4h is None or len(df_1h) < 50: continue
         
         try:
-            # Indicator Logic: MA Alignment
+            # Indicator Logic
             df_1h['ma20'] = df_1h['close'].rolling(20).mean()
             df_4h['ma50'] = df_4h['close'].rolling(50).mean()
             
@@ -50,29 +51,28 @@ def analyze_assets():
             avg_vol = df_1h['vol'].rolling(20).mean().iloc[-1]
             curr_vol = df_1h['vol'].iloc[-1]
             
-            # THE SNIPER813PRO FILTERS
+            # FILTERS: Proximity to MA + Volume Confirmation
             ma_dist = abs(((price - df_1h['ma20'].iloc[-1]) / df_1h['ma20'].iloc[-1]) * 100)
             true_north = "BULLISH" if price > df_4h['ma50'].iloc[-1] else "BEARISH"
             vol_spike = curr_vol > (avg_vol * 1.3)
             
-            # Logic: Signal triggers if price is near MA and volume confirms the move
             if ma_dist < 1.0 and vol_spike:
                 hits += 1
                 status = "🟢 SNIPER LONG" if true_north == "BULLISH" else "🔴 SNIPER SHORT"
                 sl = price * 0.98 if "LONG" in status else price * 1.02
                 
-                # Check if asset is an ETF for custom hype
-                asset_type = "🏛️ INSTITUTIONAL ETF" if name in ["GBTC", "IBIT"] else "💎 CRYPTO ASSET"
+                # Custom branding for ETFs
+                label = "🏛️ INSTITUTIONAL" if name in ["GBTC", "IBIT"] else "💎 CRYPTO"
                 
-                body += f"{asset_type}: {name}\n"
+                body += f"{label}: {name}\n"
                 body += f"🎯 ACTION: {status}\n"
-                body += f"🔥 VOL SURGE: {curr_vol/avg_vol:.1f}x AVG\n"
-                body += f"🌍 TRUE NORTH: {true_north}\n"
+                body += f"🔥 VOL: {curr_vol/avg_vol:.1f}x AVG\n"
+                body += f"🌍 TREND: {true_north}\n"
                 body += f"💰 PRICE: ${price:,.2f}\n"
-                body += f"🚫 STOP: ${sl:,.2f}\n"
-                body += f"🔗 ENTRY: {KRAKEN_LINK}\n"
+                body += f"🚫 EXIT: ${sl:,.2f}\n"
+                body += f"🔗 {KRAKEN_LINK}\n"
                 body += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        except Exception: continue
+        except: continue
             
     return header + body if hits > 0 else None
 
