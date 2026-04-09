@@ -1,14 +1,31 @@
-name: DOMI Autonomous Execution
+name: SNIPER813PRO DOMI INTELLIGENCE
+
 on:
   schedule:
-    - cron: '0 * * * *'       # Runs every hour
-  workflow_dispatch:          # Allows manual testing
+    - cron: '0 * * * *'  # Runs every hour, 24/7
+  workflow_dispatch:      # Allows you to trigger it manually for testing
+
 jobs:
-  run-domi:
+  build:
     runs-on: ubuntu-latest
-   steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # Change from 3.9 to 3.11
+          python-version: '3.11' # Upgraded to fix the Pandas/Numpy error
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests numpy
+
+      - name: Execute SNIPER813PRO
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          KRAKEN_REF_LINK: ${{ secrets.KRAKEN_REF_LINK }}
+        run: python domi_runner.py
