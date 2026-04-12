@@ -1,1 +1,35 @@
 
+name: DOMI Hourly Scan
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # Every hour on the hour (UTC)
+  workflow_dispatch:        # Manual trigger from GitHub UI
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run DOMI Scan
+        env:
+          GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY69 }}
+          KRAKEN_API_KEY:    ${{ secrets.KRAKEN_API_KEY }}
+          KRAKEN_PRIVACY_KEY: ${{ secrets.KRAKEN_PRIVACY_K }}
+          TELEGRAM_TOKEN:    ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID:  ${{ secrets.TELEGRAM_CHAT_ID }}
+          KRAKEN_REF_LINK:   ${{ secrets.KRAKEN_REF_LINK }}
+        run: python -m domi.orchestrator --mode scan
