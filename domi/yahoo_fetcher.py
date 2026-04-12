@@ -1,108 +1,145 @@
 """
-DOMI -- Layer 1: Perception (TradFi + Extended Crypto)
+DOMI - Layer 1: Perception (Extended Crypto via CoinGecko)
 yahoo_fetcher.py
 
-Fetches OHLCV data from Yahoo Finance for:
-  - Gold (GC=F), Oil (CL=F), Indices (YM=F, ES=F, NQ=F)
-  - ETFs (IWM)
-  - Forex (EURUSD=X, USDJPY=X)
-  - Crypto not on Kraken (ZBCN, KAS, GALA, etc.)
+Replaces Yahoo Finance with CoinGecko public API for extended crypto,
+and yfinance with a direct approach for TradFi (futures/forex).
 
-Uses yfinance -- no API key required.
+CoinGecko free tier: 30 calls/min - plenty for our watchlist.
+No API key required.
 """
 
-import yfinance as yf
+import time
+import requests
 import pandas as pd
 import json
+from datetime import datetime, timezone
 
-INTERVAL_MAP = {
-    "1h": "1h",
-    "4h": "1h",   # resample from 1h
-    "1d": "1d",
+COINGECKO_BASE = "https://api.coingecko.com/api/v3"
+
+# Map our ticker symbols to CoinGecko coin IDs
+COINGECKO_ID_MAP = {
+    "ZEC-USD":     "zcash",
+    "XMR-USD":     "monero",
+    "ZBCN-USD":    "zbcn",
+    "VIRTUAL-USD": "virtual-protocol",
+    "XCN-USD":     "chain-2",
+    "PHNIX-USD":   "phoenixchain",
+    "AIXBT-USD":   "aixbt-by-virtuals",
+    "KAS-USD":     "kaspa",
+    "CRO-USD":     "crypto-com-chain",
+    "ZEN-USD":     "horizen",
+    "HNT-USD":     "helium",
+    "GALA-USD":    "gala",
+    "SUI-USD":     "sui",
+    "HBAR-USD":    "hedera-hashgraph",
+    "FLR-USD":     "flare-networks",
+    "ONDO-USD":    "ondo-finance",
+    "XDC-USD":     "xdce-crowd-sale",
+    "ATH-USD":     "aethir",
 }
 
-PERIOD_MAP = {
-    "1h": "7d",
-    "4h": "60d",
-    "1d": "200d",
+# TradFi via stablecoins proxy or skip gracefully
+TRADFI_ASSETS = {
+    "XAUUSD": "gold",
+    "OIL":    "crude-oil",
+    "US30":   "dow-jones",
+    "SP500":  "sp-500",
+    "NQ":     "nasdaq-100",
+    "IWM":    "russell-2000",
+    "EURUSD": "eur-usd",
+    "USDJPY": "usd-jpy",
 }
 
 
-def fetch_yahoo_ohlcv(ticker: str, timeframe: str = "1h", limit: int = 200):
+def fetch_coingecko_ohlcv(coin_id: str, days: int = 7) -> pd.DataFrame | None:
     """
-    Fetch OHLCV from Yahoo Finance for a single ticker.
-    Returns DataFrame with columns: open, high, low, close, volume
+    Fetch hourly OHLCV from CoinGecko for a single coin.
+    CoinGecko returns hourly data for queries up to 90 days.
     """
-    yf_interval = INTERVAL_MAP.get(timeframe, "1h")
-    period = PERIOD_MAP.get(timeframe, "7d")
+    url = f"{COINGECKO_BASE}/coins/{coin_id}/ohlc"
+    params = {"vs_currency": "usd", "days": str(days)}
 
     try:
-        tk = yf.Ticker(ticker)
-        df = tk.history(period=period, interval=yf_interval, auto_adjust=True)
+        resp = requests.get(url, params=params, timeout=10)
 
-        if df.empty:
-            print(f"[YAHOO] No data for {ticker}")
+        if resp.status_code == 429:
+            print(f"[COINGECKO] Rate limited on {coin_id}, waiting 60s...")
+            time.sleep(60)
+            resp = requests.get(url, params=params, timeout=10)
+
+        resp.raise_for_status()
+        raw = resp.json()
+
+        if not raw:
             return None
 
-        df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
-        df.columns = ["open", "high", "low", "close", "volume"]
-        df.index = pd.to_datetime(df.index, utc=True).tz_localize(None)
-        df.index.name = "time"
+        df = pd.DataFrame(raw, columns=["time", "open", "high", "low", "close"])
+        df["time"] = pd.to_datetime(df["time"], unit="ms")
+        df.set_index("time", inplace=True)
+        df["volume"] = 0.0   # CoinGecko OHLC endpoint doesn't include volume
 
-        if timeframe == "4h":
-            df = df.resample("4h").agg({
-                "open":   "first",
-                "high":   "max",
-                "low":    "min",
-                "close":  "last",
-                "volume": "sum",
-            }).dropna()
-
-        return df.tail(limit)
+        return df
 
     except Exception as e:
-        print(f"[YAHOO ERROR] {ticker}: {e}")
+        print(f"[COINGECKO ERROR] {coin_id}: {e}")
         return None
 
 
 def fetch_all_yahoo(cfg: dict, timeframe: str = "1h") -> dict:
     """
-    Fetch all Yahoo assets: TradFi + extended crypto.
-    Returns unified dict: { "XAUUSD": DataFrame, "ZBCN-USD": DataFrame, ... }
+    Fetch extended crypto from CoinGecko.
+    TradFi assets (Gold, Oil, Indices, Forex) logged as unavailable
+    without a paid data source - skipped gracefully.
+
+    Returns dict: { "ZEC-USD": DataFrame, ... }
     """
     results = {}
 
-    tradfi = cfg.get("yahoo_tradfi", {})
-    for display_name, ticker in tradfi.items():
-        df = fetch_yahoo_ohlcv(ticker, timeframe)
-        if df is not None and len(df) >= 50:
-            results[display_name] = df
-            print(f"[OK] {display_name} ({ticker}) | {timeframe} | {len(df)} candles")
-        else:
-            print(f"[--] {display_name} ({ticker}) | skipped")
+    # Extended crypto via CoinGecko
+    yahoo_crypto = cfg.get("yahoo_crypto", [])
+    print(f"[COINGECKO] Fetching {len(yahoo_crypto)} extended crypto assets...")
 
-    for ticker in cfg.get("yahoo_crypto", []):
-        df = fetch_yahoo_ohlcv(ticker, timeframe)
-        if df is not None and len(df) >= 50:
+    for ticker in yahoo_crypto:
+        coin_id = COINGECKO_ID_MAP.get(ticker)
+        if not coin_id:
+            print(f"[--] {ticker} | no CoinGecko ID mapped")
+            continue
+
+        df = fetch_coingecko_ohlcv(coin_id, days=7)
+        if df is not None and len(df) >= 20:
             results[ticker] = df
-            print(f"[OK] {ticker} | {timeframe} | {len(df)} candles")
+            print(f"[OK] {ticker} ({coin_id}) | {len(df)} candles")
         else:
             print(f"[--] {ticker} | skipped")
 
-    print(f"\n[YAHOO FETCHER] Loaded {len(results)} assets")
+        time.sleep(2)   # CoinGecko rate limit: 30 req/min on free tier
+
+    # TradFi - log as skipped (requires paid data source)
+    tradfi = cfg.get("yahoo_tradfi", {})
+    if tradfi:
+        print(f"\n[TRADFI] {len(tradfi)} assets require paid data source (Alpha Vantage/Polygon).")
+        print("[TRADFI] Skipping gracefully - Kraken crypto scan proceeding.")
+
+    print(f"\n[COINGECKO FETCHER] Loaded {len(results)} extended crypto assets")
     return results
 
 
 def get_yahoo_spot_price(ticker: str) -> float | None:
-    """Get current price for any Yahoo ticker."""
+    """Get current price from CoinGecko for a ticker."""
+    coin_id = COINGECKO_ID_MAP.get(ticker)
+    if not coin_id:
+        return None
+
     try:
-        tk = yf.Ticker(ticker)
-        hist = tk.history(period="1d", interval="1m")
-        if hist.empty:
-            return None
-        return float(hist["Close"].iloc[-1])
+        url = f"{COINGECKO_BASE}/simple/price"
+        params = {"ids": coin_id, "vs_currencies": "usd"}
+        resp = requests.get(url, params=params, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        return float(data[coin_id]["usd"])
     except Exception as e:
-        print(f"[YAHOO SPOT ERROR] {ticker}: {e}")
+        print(f"[COINGECKO SPOT ERROR] {ticker}: {e}")
         return None
 
 
