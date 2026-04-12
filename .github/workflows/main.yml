@@ -1,0 +1,15 @@
+domi-agent/
+├── .github/
+│   └── workflows/
+│       ├── domi_scan.yml        ← runs every hour
+│       └── domi_morning.yml     ← 6AM Medellín briefing
+├── domi/
+│   ├── orchestrator.py          ← DOMI brain (Gemini)
+│   ├── kraken_fetcher.py        ← market data worker
+│   ├── signal_engine.py         ← Goalden Setup filter
+│   ├── telegram_worker.py       ← blast signals
+│   └── trade_executor.py        ← Kraken order execution
+├── config/
+│   └── watchlist.json           ← your 24-pair list
+├── requirements.txt
+└── README.md
