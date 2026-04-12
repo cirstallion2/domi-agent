@@ -1,0 +1,34 @@
+name: DOMI Content Engine
+
+on:
+  schedule:
+    - cron: '0 12 * * *'
+    - cron: '0 17 * * *'
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+
+jobs:
+  content:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run DOMI Content Engine
+        env:
+          GEMINI_API_KEY:  ${{ secrets.GEMINI_API_KEY69 }}
+          TELEGRAM_TOKEN:  ${{ secrets.TELEGRAM_TOKEN }}
+          PERSONAL_CHAT_ID: "7419276203"
+          PYTHONPATH:      ${{ github.workspace }}
+        run: python run_content.py
