@@ -2,16 +2,15 @@
 DOMI - Phase 5: Content-to-Conversion Loop
 content_engine.py
 
-Scans macro crypto news via web search.
-Gemini writes post in 2much813 voice.
-Sends to personal Telegram chat for review before posting to X.
-
-Schedule: runs 3x daily via GitHub Actions
+Pulls crypto news from free RSS feeds (no API key needed).
+Gemini picks top story + writes post in 2much813 voice.
+Sends to personal Telegram for review.
 """
 
 import os
 import sys
 import requests
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,185 +28,166 @@ CONTENT_VOICE = (
     "2much813 is a Market Translator - not a content creator. "
     "Voice: direct, technical, high-conviction. Short punchy sentences. "
     "No fluff. No hedging. You front-run the rotation while retail guesses. "
-    "Write for X (Twitter) - max 280 characters for the hook, "
-    "then 2-3 follow-up lines of context. "
-    "Always end with a CTA: 'The Dojo already saw this coming. Tap in.' "
-    "No hashtags in body. Add 3 relevant hashtags at the end only."
+    "Write for X (Twitter). Hook line first (max 280 chars). "
+    "Then 2-3 lines of technical context - what does this mean for price? "
+    "End with: The Dojo already saw this coming. Tap in to stay ahead. "
+    "Add 3 relevant hashtags at the end only. No hashtags in body."
 )
 
-NEWS_SOURCES = [
-    "https://cryptopanic.com/api/v1/posts/?auth_token=public&kind=news&filter=hot",
-    "https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest",
+RSS_FEEDS = [
+    ("CoinDesk",     "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+    ("CoinTelegraph","https://cointelegraph.com/rss"),
+    ("Decrypt",      "https://decrypt.co/feed"),
+    ("Bitcoin Mag",  "https://bitcoinmagazine.com/feed"),
 ]
 
 
-def fetch_crypto_news() -> list[dict]:
-    """
-    Fetch latest hot crypto news from free public APIs.
-    Returns list of {title, url, source} dicts.
-    """
-    articles = []
-
-    # CryptoCompare free news API
+def fetch_rss(url: str, source: str, limit: int = 5) -> list[dict]:
+    """Fetch and parse a single RSS feed."""
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; DOMI-Agent/1.0)"}
     try:
-        resp = requests.get(
-            "https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest",
-            timeout=10
-        )
+        resp = requests.get(url, headers=headers, timeout=10)
         resp.raise_for_status()
-        data = resp.json().get("Data", [])
-        for item in data[:10]:
-            articles.append({
-                "title":  item.get("title", ""),
-                "body":   item.get("body", "")[:300],
-                "source": item.get("source_info", {}).get("name", ""),
-                "url":    item.get("url", ""),
-            })
-        print(f"[NEWS] Fetched {len(articles)} articles from CryptoCompare")
-    except Exception as e:
-        print(f"[NEWS ERROR] CryptoCompare: {e}")
-
-    # CryptoPanic backup
-    if not articles:
-        try:
-            resp = requests.get(
-                "https://cryptopanic.com/api/v1/posts/?auth_token=public&kind=news&filter=hot",
-                timeout=10
-            )
-            resp.raise_for_status()
-            results = resp.json().get("results", [])
-            for item in results[:10]:
+        root = ET.fromstring(resp.content)
+        items = root.findall(".//item")
+        articles = []
+        for item in items[:limit]:
+            title = item.findtext("title", "").strip()
+            desc  = item.findtext("description", "").strip()[:300]
+            link  = item.findtext("link", "").strip()
+            if title:
                 articles.append({
-                    "title":  item.get("title", ""),
-                    "body":   "",
-                    "source": item.get("source", {}).get("title", ""),
-                    "url":    item.get("url", ""),
+                    "title":  title,
+                    "body":   desc,
+                    "source": source,
+                    "url":    link,
                 })
-            print(f"[NEWS] Fetched {len(articles)} articles from CryptoPanic")
-        except Exception as e:
-            print(f"[NEWS ERROR] CryptoPanic: {e}")
-
-    return articles
-
-
-def pick_top_story(articles: list[dict]) -> dict | None:
-    """Use Gemini to pick the most tradeable story from the headlines."""
-    if not articles:
-        return None
-
-    headlines = "\n".join([
-        f"{i+1}. {a['title']} ({a['source']})"
-        for i, a in enumerate(articles)
-    ])
-
-    prompt = (
-        "You are DOMI, market intelligence AI for SNIPER813PRO.\n"
-        "Pick the ONE most market-moving crypto news story from this list.\n"
-        "Choose based on: macro impact, price action potential, trader relevance.\n"
-        "Reply with ONLY the number of the story. Nothing else.\n\n"
-        f"{headlines}"
-    )
-
-    api_key = os.environ.get("GEMINI_API_KEY", "")
-    if not api_key:
-        return articles[0]
-
-    try:
-        resp = requests.post(
-            GEMINI_API_URL,
-            headers={"Content-Type": "application/json"},
-            params={"key": api_key},
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"maxOutputTokens": 5, "temperature": 0.3},
-            },
-            timeout=15
-        )
-        resp.raise_for_status()
-        pick = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-        idx = int(pick) - 1
-        if 0 <= idx < len(articles):
-            print(f"[CONTENT] Top story: {articles[idx]['title'][:60]}...")
-            return articles[idx]
+        return articles
     except Exception as e:
-        print(f"[CONTENT] Story picker error: {e}")
+        print(f"[RSS ERROR] {source}: {e}")
+        return []
 
-    return articles[0]
+
+def fetch_crypto_news() -> list[dict]:
+    """Fetch headlines from all RSS feeds."""
+    all_articles = []
+    for source, url in RSS_FEEDS:
+        articles = fetch_rss(url, source)
+        all_articles.extend(articles)
+        if articles:
+            print(f"[NEWS] {source}: {len(articles)} articles")
+
+    print(f"[NEWS] Total: {len(all_articles)} articles fetched")
+    return all_articles
 
 
-def write_content_post(story: dict) -> str:
-    """Gemini writes the 2much813 post from the news story."""
+def call_gemini(prompt: str, system: str = "", max_tokens: int = 300, temp: float = 0.7) -> str:
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
+        print("[GEMINI] No API key")
         return ""
-
-    prompt = (
-        f"News story: {story['title']}\n"
-        f"Details: {story['body']}\n"
-        f"Source: {story['source']}\n\n"
-        "Write a 2much813 market post about this news. "
-        "Hook line first (max 280 chars). "
-        "Then 2-3 lines of technical context - what does this mean for price? "
-        "What should traders watch? "
-        "End with: The Dojo already saw this coming. Tap in to stay ahead. "
-        "Add 3 hashtags at the end. "
-        "Total post should fit in a Telegram message."
-    )
-
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": temp},
+    }
+    if system:
+        body["system_instruction"] = {"parts": [{"text": system}]}
     try:
         resp = requests.post(
             GEMINI_API_URL,
             headers={"Content-Type": "application/json"},
             params={"key": api_key},
-            json={
-                "system_instruction": {"parts": [{"text": CONTENT_VOICE}]},
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"maxOutputTokens": 300, "temperature": 0.8},
-            },
+            json=body,
             timeout=15
         )
         resp.raise_for_status()
         return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
     except Exception as e:
-        print(f"[CONTENT] Write error: {e}")
+        print(f"[GEMINI ERROR] {e}")
         return ""
 
 
-def send_to_personal(message: str) -> bool:
-    """Send content post to personal Telegram chat for review."""
+def pick_top_story(articles: list[dict]) -> dict | None:
+    """Gemini picks the most market-moving headline."""
+    if not articles:
+        return None
+
+    headlines = "\n".join([
+        f"{i+1}. [{a['source']}] {a['title']}"
+        for i, a in enumerate(articles)
+    ])
+
+    prompt = (
+        "You are a crypto market analyst. "
+        "Pick the ONE most market-moving story from this list. "
+        "Choose based on: macro impact, price action potential, trader relevance. "
+        "Reply with ONLY the number. Nothing else.\n\n"
+        + headlines
+    )
+
+    pick = call_gemini(prompt, max_tokens=5, temp=0.2)
+    try:
+        idx = int(pick.strip()) - 1
+        if 0 <= idx < len(articles):
+            print(f"[CONTENT] Top story: {articles[idx]['title'][:70]}...")
+            return articles[idx]
+    except Exception:
+        pass
+
+    return articles[0]
+
+
+def write_post(story: dict) -> str:
+    """Gemini writes the 2much813 post."""
+    prompt = (
+        f"News: {story['title']}\n"
+        f"Details: {story['body']}\n"
+        f"Source: {story['source']}\n\n"
+        "Write the 2much813 market post. "
+        "Hook first. Then 2-3 lines of what this means for price action. "
+        "End with: The Dojo already saw this coming. Tap in to stay ahead. "
+        "3 hashtags at the end only."
+    )
+    return call_gemini(prompt, system=CONTENT_VOICE, max_tokens=350, temp=0.8)
+
+
+def send_to_personal(post: str, story: dict) -> bool:
+    """Send generated post to personal Telegram chat."""
     token = os.environ.get("TELEGRAM_TOKEN", "")
     if not token:
         print("[CONTENT] No Telegram token")
         return False
 
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    header = (
-        "📝 *DOMI CONTENT DROP*\n"
-        "_Review before posting to X_\n"
-        f"_{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_\n\n"
-        "---\n\n"
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    message = (
+        f"*DOMI CONTENT DROP*\n"
+        f"_{timestamp}_\n"
+        f"Source: {story['source']}\n\n"
+        f"{post}\n\n"
+        f"[Read original]({story['url']})"
     )
 
-    payload = {
-        "chat_id":    PERSONAL_CHAT_ID,
-        "text":       header + message,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": True,
-    }
-
     try:
-        resp = requests.post(url, json=payload, timeout=10)
+        resp = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={
+                "chat_id":    PERSONAL_CHAT_ID,
+                "text":       message,
+                "parse_mode": "Markdown",
+                "disable_web_page_preview": True,
+            },
+            timeout=10
+        )
         resp.raise_for_status()
-        print(f"[CONTENT] Post sent to personal chat ({PERSONAL_CHAT_ID})")
+        print(f"[CONTENT] Sent to personal chat {PERSONAL_CHAT_ID}")
         return True
-    except requests.RequestException as e:
+    except Exception as e:
         print(f"[CONTENT] Send error: {e}")
         return False
 
 
 def run_content_engine():
-    """Full pipeline: fetch news -> pick story -> write post -> send to personal chat."""
-    print(f"\n[CONTENT] Running at {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    print(f"\n[CONTENT] {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
 
     articles = fetch_crypto_news()
     if not articles:
@@ -219,13 +199,13 @@ def run_content_engine():
         print("[CONTENT] No story selected. Skipping.")
         return
 
-    post = write_content_post(story)
+    post = write_post(story)
     if not post:
         print("[CONTENT] No post generated. Skipping.")
         return
 
-    print(f"\n[CONTENT] Generated post:\n{post[:200]}...")
-    send_to_personal(post)
+    print(f"\n[CONTENT] Post preview:\n{post[:200]}...\n")
+    send_to_personal(post, story)
 
 
 if __name__ == "__main__":
