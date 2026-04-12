@@ -27,14 +27,14 @@ jobs:
 
       - name: Run DOMI Scan
         env:
-          GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY69 }}
+          GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY693247102287 }}
           KRAKEN_API_KEY:     ${{ secrets.KRAKEN_API_KEY }}
           KRAKEN_PRIVACY_KEY: ${{ secrets.KRAKEN_PRIVACY_K }}
           TELEGRAM_TOKEN:     ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
           KRAKEN_REF_LINK:    ${{ secrets.KRAKEN_REF_LINK }}
           PYTHONPATH:         ${{ github.workspace }}
-        run: python domi/orchestrator.py --mode scan
+        run: python run_scan.py
 
       - name: Commit signal log
         run: |
