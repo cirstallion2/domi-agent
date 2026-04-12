@@ -1,15 +1,14 @@
 name: DOMI Hourly Scan
-
 on:
   schedule:
-    - cron: '0 * * * *'   # Every hour on the hour (UTC)
-  workflow_dispatch:        # Manual trigger from GitHub UI
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true # Clears the deprecation warning
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -18,10 +17,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Force Install pandas_ta
+        run: |
+          pip install pandas==2.2.2 numpy==1.26.4 requests==2.31.0 yfinance==0.2.54 krakenex==2.1.0
+          pip install https://github.com/twopirllc/pandas-ta/archive/refs/heads/development.zip
 
       - name: Run DOMI Scan
         env:
@@ -30,5 +30,4 @@ jobs:
           KRAKEN_PRIVACY_KEY: ${{ secrets.KRAKEN_PRIVACY_K }}
           TELEGRAM_TOKEN:    ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID:  ${{ secrets.TELEGRAM_CHAT_ID }}
-          KRAKEN_REF_LINK:   ${{ secrets.KRAKEN_REF_LINK }}
         run: python -m domi.orchestrator --mode scan
