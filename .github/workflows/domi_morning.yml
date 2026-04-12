@@ -33,4 +33,4 @@ jobs:
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
           KRAKEN_REF_LINK:    ${{ secrets.KRAKEN_REF_LINK }}
           PYTHONPATH:         ${{ github.workspace }}
-        run: python domi/orchestrator.py --mode briefing
+        run: python run_briefing.py
