@@ -26,7 +26,7 @@ jobs:
 
       - name: Run DOMI Briefing
         env:
-          GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY69 }}
+          GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY693247102287 }}
           KRAKEN_API_KEY:     ${{ secrets.KRAKEN_API_KEY }}
           KRAKEN_PRIVACY_KEY: ${{ secrets.KRAKEN_PRIVACY_K }}
           TELEGRAM_TOKEN:     ${{ secrets.TELEGRAM_TOKEN }}
