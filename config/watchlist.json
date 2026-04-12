@@ -1,19 +1,36 @@
 {
   "kraken_pairs": [
-    "XBTUSD", "ETH/USD", "SOL/USD", "XRP/USD",
-    "ADA/USD", "AVAX/USD", "LINK/USD", "MANA/USD",
-    "ALGO/USD", "NEAR/USD", "LTC/USD", "AAVE/USD",
-    "ATOM/USD", "DOT/USD", "DOGE/USD", "XLM/USD",
-    "ZEC/USD", "XMR/USD", "HBAR/USD", "GRT/USD",
-    "FLR/USD", "KSM/USD", "ONDO/USD", "SUI/USD"
-  ],
-
-  "yahoo_crypto": [
-    "ZEC-USD", "XMR-USD", "ZBCN-USD", "VIRTUAL-USD",
-    "XCN-USD", "PHNIX-USD", "AIXBT-USD",
-    "KAS-USD", "CRO-USD", "ZEN-USD", "HNT-USD",
-    "GALA-USD", "HBAR-USD", "FLR-USD",
-    "ONDO-USD", "XDC-USD"
+    "XBTUSD",
+    "ETH/USD",
+    "SOL/USD",
+    "XRP/USD",
+    "ADA/USD",
+    "AVAX/USD",
+    "LINK/USD",
+    "ALGO/USD",
+    "NEAR/USD",
+    "LTC/USD",
+    "AAVE/USD",
+    "ATOM/USD",
+    "DOT/USD",
+    "DOGE/USD",
+    "XLM/USD",
+    "ZEC/USD",
+    "XMR/USD",
+    "HBAR/USD",
+    "GRT/USD",
+    "KSM/USD",
+    "ONDO/USD",
+    "SUI/USD",
+    "KAS/USD",
+    "MANA/USD",
+    "GALA/USD",
+    "ZEN/USD",
+    "FLR/USD",
+    "CRO/USD",
+    "ZBCN/USD",
+    "VIRTUAL/USD",
+    "AIXBT/USD"
   ],
 
   "yahoo_tradfi": {
