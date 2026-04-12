@@ -2,15 +2,21 @@ name: DOMI Content Engine
 
 on:
   schedule:
-    - cron: '0 12 * * *'
-    - cron: '0 17 * * *'
-    - cron: '0 22 * * *'
+    # Market posts (Medellin UTC-5): 5AM=10UTC, 4PM=21UTC, 9PM=02UTC
+    - cron: '0 10 * * *'
+    - cron: '0 21 * * *'
+    - cron: '0 2  * * *'
+    # HeyGen scripts - staggered between post times
+    - cron: '0 13 * * *'
+    - cron: '0 16 * * *'
+    - cron: '0 19 * * *'
+    - cron: '0 0  * * *'
   workflow_dispatch:
 
 jobs:
   content:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repo
@@ -29,10 +35,6 @@ jobs:
         env:
           GEMINI_API_KEY:   ${{ secrets.GEMINI_CONTENT_KEY }}
           TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PERSONAL_CHAT_ID: "7419276203"
           PYTHONPATH:       ${{ github.workspace }}
-        run: |
-          echo "GEMINI key present: $( [ -n "$GEMINI_API_KEY" ] && echo YES || echo NO )"
-          echo "TELEGRAM token present: $( [ -n "$TELEGRAM_TOKEN" ] && echo YES || echo NO )"
-          python run_content.py
+        run: python run_content.py
