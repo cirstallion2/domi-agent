@@ -1,6 +1,6 @@
 {
   "kraken_pairs": [
-    "BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD",
+    "XBTUSD", "ETH/USD", "SOL/USD", "XRP/USD",
     "ADA/USD", "AVAX/USD", "LINK/USD", "MANA/USD",
     "ALGO/USD", "NEAR/USD", "LTC/USD", "AAVE/USD",
     "ATOM/USD", "DOT/USD", "DOGE/USD", "XLM/USD",
@@ -12,8 +12,8 @@
     "ZEC-USD", "XMR-USD", "ZBCN-USD", "VIRTUAL-USD",
     "XCN-USD", "PHNIX-USD", "AIXBT-USD",
     "KAS-USD", "CRO-USD", "ZEN-USD", "HNT-USD",
-    "GALA-USD", "SUI-USD", "HBAR-USD", "FLR-USD",
-    "ONDO-USD", "XDC-USD", "ATH-USD"
+    "GALA-USD", "HBAR-USD", "FLR-USD",
+    "ONDO-USD", "XDC-USD"
   ],
 
   "yahoo_tradfi": {
@@ -22,7 +22,6 @@
     "US30":   "YM=F",
     "SP500":  "ES=F",
     "NQ":     "NQ=F",
-    "IWM":    "IWM",
     "EURUSD": "EURUSD=X",
     "USDJPY": "USDJPY=X"
   },
