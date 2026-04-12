@@ -9,6 +9,8 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repo
@@ -33,3 +35,11 @@ jobs:
           KRAKEN_REF_LINK:    ${{ secrets.KRAKEN_REF_LINK }}
           PYTHONPATH:         ${{ github.workspace }}
         run: python domi/orchestrator.py --mode scan
+
+      - name: Commit signal log
+        run: |
+          git config user.name "DOMI Agent"
+          git config user.email "domi@sniper813pro.com"
+          git add data/signals_log.json || true
+          git diff --staged --quiet || git commit -m "DOMI: update signal log [skip ci]"
+          git push || true
