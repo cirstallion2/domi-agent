@@ -1,71 +1,53 @@
-"""
-DOMI - Layer 1: Perception (TradFi only)
-yahoo_fetcher.py
+{
+  "kraken_pairs": [
+    "XBTUSD",
+    "ETH/USD",
+    "SOL/USD",
+    "XRP/USD",
+    "ADA/USD",
+    "AVAX/USD",
+    "LINK/USD",
+    "ALGO/USD",
+    "NEAR/USD",
+    "LTC/USD",
+    "AAVE/USD",
+    "ATOM/USD",
+    "DOT/USD",
+    "DOGE/USD",
+    "XLM/USD",
+    "ZEC/USD",
+    "XMR/USD",
+    "HBAR/USD",
+    "GRT/USD",
+    "KSM/USD",
+    "ONDO/USD",
+    "SUI/USD",
+    "KAS/USD",
+    "MANA/USD",
+    "GALA/USD",
+    "ZEN/USD",
+    "FLR/USD",
+    "CRO/USD",
+    "ZBCN/USD",
+    "VIRTUAL/USD",
+    "AIXBT/USD"
+  ],
 
-Fetches Gold, Oil, Indices, Forex via yfinance.
-60-day window gives 500+ hourly candles for 200 EMA.
-"""
+  "forexfactory": {
+    "enabled": true,
+    "impact_filter": ["High"],
+    "currencies": ["USD", "EUR", "JPY", "XAU"],
+    "kill_signal_on_high_impact": true,
+    "pre_event_buffer_minutes": 30
+  },
 
-import pandas as pd
-import json
-
-
-def fetch_yfinance_ohlcv(ticker: str, period: str = "60d", interval: str = "1h"):
-    try:
-        import yfinance as yf
-        tk = yf.Ticker(ticker)
-        df = tk.history(period=period, interval=interval, auto_adjust=True)
-        if df.empty:
-            return None
-        df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
-        df.columns = ["open", "high", "low", "close", "volume"]
-        df.index = pd.to_datetime(df.index, utc=True).tz_localize(None)
-        df.index.name = "time"
-        return df
-    except Exception as e:
-        print(f"[YFINANCE ERROR] {ticker}: {e}")
-        return None
-
-
-def fetch_all_yahoo(cfg: dict, timeframe: str = "1h") -> dict:
-    """Fetch TradFi assets. Returns dict: { 'XAUUSD': DataFrame, ... }"""
-    results = {}
-    tradfi = cfg.get("yahoo_tradfi", {})
-
-    if not tradfi:
-        return results
-
-    print(f"[TRADFI] Fetching {len(tradfi)} assets (60d)...")
-    for display_name, ticker in tradfi.items():
-        df = fetch_yfinance_ohlcv(ticker, period="60d", interval="1h")
-        if df is not None and len(df) >= 210:
-            results[display_name] = df
-            print(f"[OK] {display_name} ({ticker}) | {len(df)} candles")
-        elif df is not None:
-            print(f"[--] {display_name} | only {len(df)} candles (need 210+)")
-        else:
-            print(f"[--] {display_name} | no data")
-
-    print(f"[TRADFI] Loaded {len(results)} assets")
-    return results
-
-
-def get_yahoo_spot_price(ticker: str) -> float | None:
-    try:
-        import yfinance as yf
-        tk = yf.Ticker(ticker)
-        hist = tk.history(period="1d", interval="1m")
-        if hist.empty:
-            return None
-        return float(hist["Close"].iloc[-1])
-    except Exception as e:
-        print(f"[YFINANCE SPOT ERROR] {ticker}: {e}")
-        return None
-
-
-if __name__ == "__main__":
-    with open("config/watchlist.json") as f:
-        cfg = json.load(f)
-    data = fetch_all_yahoo(cfg)
-    for name, df in data.items():
-        print(f"{name}: {len(df)} candles")
+  "timeframes": ["1d", "4h", "1h"],
+  "primary_tf": "1h",
+  "ema_periods": [9, 20, 50, 100, 200],
+  "keltner_period": 20,
+  "keltner_atr_mult": 2.0,
+  "stoch_k": 14,
+  "stoch_d": 3,
+  "rsi_period": 14,
+  "signal_score_threshold": 4
+}
