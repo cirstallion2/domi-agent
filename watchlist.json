@@ -1,1 +1,47 @@
+{
+  "kraken_pairs": [
+    "XBT/USD", "ETH/USD", "SOL/USD", "XRP/USD",
+    "ADA/USD", "AVAX/USD", "LINK/USD", "MANA/USD",
+    "ALGO/USD", "NEAR/USD", "LTC/USD", "AAVE/USD",
+    "ATOM/USD", "DOT/USD", "DOGE/USD", "XLM/USD",
+    "ZEC/USD", "XMR/USD", "HBAR/USD", "GRT/USD",
+    "FLR/USD", "KSM/USD", "ONDO/USD", "SUI/USD"
+  ],
 
+  "yahoo_crypto": [
+    "ZEC-USD", "XMR-USD", "ZBCN-USD", "VIRTUAL-USD",
+    "XCN-USD", "PHNIX-USD", "AIXBT-USD",
+    "KAS-USD", "CRO-USD", "ZEN-USD", "HNT-USD",
+    "GALA-USD", "SUI-USD", "HBAR-USD", "FLR-USD",
+    "ONDO-USD", "XDC-USD", "ATH-USD"
+  ],
+
+  "yahoo_tradfi": {
+    "XAUUSD": "GC=F",
+    "OIL":    "CL=F",
+    "US30":   "YM=F",
+    "SP500":  "ES=F",
+    "NQ":     "NQ=F",
+    "IWM":    "IWM",
+    "EURUSD": "EURUSD=X",
+    "USDJPY": "USDJPY=X"
+  },
+
+  "forexfactory": {
+    "enabled": true,
+    "impact_filter": ["High"],
+    "currencies": ["USD", "EUR", "JPY", "XAU"],
+    "kill_signal_on_high_impact": true,
+    "pre_event_buffer_minutes": 30
+  },
+
+  "timeframes": ["1d", "4h", "1h"],
+  "primary_tf": "1h",
+  "ema_periods": [9, 20, 50, 100, 200],
+  "keltner_period": 20,
+  "keltner_atr_mult": 2.0,
+  "stoch_k": 14,
+  "stoch_d": 3,
+  "rsi_period": 14,
+  "signal_score_threshold": 4
+}
