@@ -7,27 +7,18 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    # STEP 1: Opt-in to Node 24 now to clear the warning
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true # Clears the deprecation warning
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      
     steps:
+      # STEP 2: Use the latest action versions that support Node 24
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4 # v4 already supports Node 24
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5 # v5 is optimized for Node 24
         with:
           python-version: '3.11'
-
-      - name: Force Install pandas_ta
-        run: |
-          pip install pandas==2.2.2 numpy==1.26.4 requests==2.31.0 yfinance==0.2.54 krakenex==2.1.0
-          pip install https://github.com/twopirllc/pandas-ta/archive/refs/heads/development.zip
-
-      - name: Run DOMI Scan
-        env:
-          GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY69 }}
-          KRAKEN_API_KEY:    ${{ secrets.KRAKEN_API_KEY }}
-          KRAKEN_PRIVACY_KEY: ${{ secrets.KRAKEN_PRIVACY_K }}
-          TELEGRAM_TOKEN:    ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID:  ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python -m domi.orchestrator --mode scan
+          
+      # [Rest of your steps...]
