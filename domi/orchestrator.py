@@ -14,11 +14,9 @@ import argparse
 import requests
 from datetime import datetime
 
-# Ensure repo root is on path when called as a script
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from domi.kraken_fetcher       import fetch_all_pairs
-from domi.yahoo_fetcher        import fetch_all_yahoo
 from domi.forexfactory_scraper import fetch_forexfactory_events, check_news_window, format_upcoming_events
 from domi.signal_engine        import run_scan, Signal
 from domi.telegram_worker      import blast_signal, send_domi_briefing
@@ -45,7 +43,6 @@ def call_gemini(prompt: str) -> str:
     if not api_key:
         print("[GEMINI] No API key - skipping AI analysis")
         return ""
-
     headers = {"Content-Type": "application/json"}
     params  = {"key": api_key}
     body = {
@@ -53,7 +50,6 @@ def call_gemini(prompt: str) -> str:
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": 200, "temperature": 0.7},
     }
-
     try:
         resp = requests.post(GEMINI_API_URL, headers=headers, params=params, json=body, timeout=15)
         resp.raise_for_status()
@@ -87,7 +83,6 @@ def build_briefing_prompt(signals: list, timestamp: str, events_text: str = "") 
     summary = "\n".join(
         [f"- {s.pair}: {s.direction} | Score {s.score}/6 | Price {s.price}" for s in top]
     ) or "No qualifying signals at this time."
-
     return (
         f"DOMI market scan complete. Time: {timestamp}\n\n"
         f"Top signals:\n{summary}\n\n"
@@ -100,7 +95,10 @@ def build_briefing_prompt(signals: list, timestamp: str, events_text: str = "") 
 
 
 def load_config() -> dict:
-    cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "watchlist.json")
+    cfg_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "config", "watchlist.json"
+    )
     with open(cfg_path) as f:
         return json.load(f)
 
@@ -110,7 +108,6 @@ def run_scan_mode(cfg: dict):
     print(f"[DOMI] SCAN MODE | {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
     print(f"{'='*50}\n")
 
-    # Step 0: ForexFactory news check
     print("[DOMI] Checking ForexFactory...")
     ff_events  = fetch_forexfactory_events(cfg)
     news_check = check_news_window(ff_events, cfg)
@@ -120,20 +117,13 @@ def run_scan_mode(cfg: dict):
         print("[DOMI] High-impact event imminent. Killing scan.")
         return
 
-    # Step 1: Fetch data
     print("\n[DOMI] Fetching Kraken pairs...")
-    kraken_data = fetch_all_pairs(cfg["kraken_pairs"], timeframe=cfg["primary_tf"])
-
-    print("\n[DOMI] Fetching Yahoo assets...")
-    yahoo_data  = fetch_all_yahoo(cfg, timeframe=cfg["primary_tf"])
-
-    market_data = {**kraken_data, **yahoo_data}
+    market_data = fetch_all_pairs(cfg["kraken_pairs"], timeframe=cfg["primary_tf"])
 
     if not market_data:
         print("[DOMI] No market data. Aborting.")
         return
 
-    # Step 2: Score signals
     signals      = run_scan(market_data, cfg)
     gold_signals = [s for s in signals if s.grade == "GOLD"]
     print(f"\n[DOMI] Gold signals: {len(gold_signals)}")
@@ -142,7 +132,6 @@ def run_scan_mode(cfg: dict):
         print("[DOMI] No Gold signals this scan. Staying sharp.")
         return
 
-    # Step 3+4: Gemini analysis + Telegram blast
     news_flag = f"\n\nNews Flag: {news_check['reason']}" if news_check["flag"] else ""
 
     for sig in gold_signals:
@@ -160,12 +149,9 @@ def run_briefing_mode(cfg: dict):
     ff_events   = fetch_forexfactory_events(cfg)
     events_text = format_upcoming_events(ff_events)
 
-    kraken_data = fetch_all_pairs(cfg["kraken_pairs"][:12], timeframe=cfg["primary_tf"])
-    yahoo_data  = fetch_all_yahoo(cfg, timeframe=cfg["primary_tf"])
-    market_data = {**kraken_data, **yahoo_data}
-
-    signals   = run_scan(market_data, cfg) if market_data else []
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    market_data = fetch_all_pairs(cfg["kraken_pairs"], timeframe=cfg["primary_tf"])
+    signals     = run_scan(market_data, cfg) if market_data else []
+    timestamp   = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
     briefing = call_gemini(build_briefing_prompt(signals, timestamp, events_text))
 
@@ -182,9 +168,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DOMI Orchestrator")
     parser.add_argument("--mode", choices=["scan", "briefing"], default="scan")
     args = parser.parse_args()
-
     cfg = load_config()
-
     if args.mode == "scan":
         run_scan_mode(cfg)
     elif args.mode == "briefing":
