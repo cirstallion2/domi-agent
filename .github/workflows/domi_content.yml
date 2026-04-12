@@ -27,7 +27,7 @@ jobs:
 
       - name: Run DOMI Content Engine
         env:
-          GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY69 }}
+          GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY693247102287 }}
           TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PERSONAL_CHAT_ID: "7419276203"
