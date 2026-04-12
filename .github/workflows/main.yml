@@ -1,0 +1,15 @@
+domi-agent/
+├── .github/workflows/
+│   ├── domi_scan.yml        <-- Hourly scan logic [cite: 2]
+│   └── domi_morning.yml     <-- Morning/Evening briefing [cite: 2]
+├── domi/
+│   ├── orchestrator.py      <-- The Brain (Gemini 2.0 Flash) [cite: 2]
+│   ├── kraken_fetcher.py    <-- Layer 1: Crypto Data [cite: 2]
+│   ├── yahoo_fetcher.py     <-- Layer 1: TradFi/Alt-Crypto [cite: 2]
+│   ├── forexfactory_scraper.py <-- The News Kill-Switch [cite: 2]
+│   ├── signal_engine.py     <-- Layer 2: 6-Point Scorer [cite: 2]
+│   └── telegram_worker.py   <-- Layer 3: Execution/Alerts [cite: 2]
+├── config/
+│   └── watchlist.json       <-- 50+ Assets & Parameters [cite: 2]
+├── requirements.txt         <-- Python Dependencies [cite: 2]
+└── README.md
