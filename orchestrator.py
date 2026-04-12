@@ -1,4 +1,3 @@
-
 """
 DOMI — Layer 2: Reasoning (Master Orchestrator)
 orchestrator.py
@@ -20,9 +19,11 @@ import argparse
 import requests
 from datetime import datetime
 
-from domi.kraken_fetcher import fetch_all_pairs
-from domi.signal_engine  import run_scan, Signal
-from domi.telegram_worker import blast_signal, send_domi_briefing
+from domi.kraken_fetcher       import fetch_all_pairs
+from domi.yahoo_fetcher        import fetch_all_yahoo
+from domi.forexfactory_scraper import fetch_forexfactory_events, check_news_window, format_upcoming_events
+from domi.signal_engine        import run_scan, Signal
+from domi.telegram_worker      import blast_signal, send_domi_briefing
 
 # ── Gemini Config ──────────────────────────────────────────────────────────
 GEMINI_MODEL   = "gemini-2.0-flash"
@@ -122,20 +123,36 @@ Do not use bullet points.
 
 
 def run_scan_mode(cfg: dict):
-    """Hourly scan: fetch → score → analyze → blast Gold signals."""
+    """Hourly scan: ForexFactory check → fetch → score → analyze → blast Gold signals."""
     print(f"\n{'='*50}")
     print(f"[DOMI] SCAN MODE | {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
     print(f"{'='*50}\n")
 
-    # Step 1: Fetch market data
-    market_data = fetch_all_pairs(cfg["pairs"], timeframe=cfg["primary_tf"])
+    # Step 0: ForexFactory news window check
+    print("[DOMI] Checking ForexFactory news calendar...")
+    ff_events  = fetch_forexfactory_events(cfg)
+    news_check = check_news_window(ff_events, cfg)
+    print(f"[FF] {news_check['reason']}")
+
+    if news_check["kill"]:
+        print("[DOMI] High-impact event imminent. Killing scan to protect capital.")
+        return
+
+    # Step 1: Fetch market data -- Kraken + Yahoo
+    print("\n[DOMI] Fetching Kraken pairs...")
+    kraken_data = fetch_all_pairs(cfg["kraken_pairs"], timeframe=cfg["primary_tf"])
+
+    print("\n[DOMI] Fetching Yahoo Finance assets...")
+    yahoo_data  = fetch_all_yahoo(cfg, timeframe=cfg["primary_tf"])
+
+    market_data = {**kraken_data, **yahoo_data}
 
     if not market_data:
         print("[DOMI] No market data retrieved. Aborting.")
         return
 
     # Step 2: Score signals
-    signals = run_scan(market_data, cfg)
+    signals      = run_scan(market_data, cfg)
     gold_signals = [s for s in signals if s.grade == "GOLD"]
 
     print(f"\n[DOMI] Gold signals: {len(gold_signals)}")
@@ -145,25 +162,32 @@ def run_scan_mode(cfg: dict):
         return
 
     # Step 3 + 4: Gemini analysis → Telegram blast
+    news_flag = f"\n\n⚠️ *News Flag:* {news_check['reason']}" if news_check["flag"] else ""
+
     for sig in gold_signals:
         print(f"\n[DOMI] Analyzing {sig.pair}...")
         prompt   = build_signal_prompt(sig)
-        analysis = call_gemini(prompt)
+        analysis = call_gemini(prompt) + news_flag
         print(f"[GEMINI] {analysis[:100]}...")
         blast_signal(sig, analysis)
 
 
 def run_briefing_mode(cfg: dict):
-    """Morning/evening briefing: scan + write briefing + send."""
+    """Morning/evening briefing: scan + ForexFactory events + write briefing + send."""
     print(f"\n{'='*50}")
     print(f"[DOMI] BRIEFING MODE | {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
     print(f"{'='*50}\n")
 
-    market_data = fetch_all_pairs(cfg["pairs"][:12], timeframe=cfg["primary_tf"])
+    ff_events   = fetch_forexfactory_events(cfg)
+    events_text = format_upcoming_events(ff_events)
+
+    kraken_data = fetch_all_pairs(cfg["kraken_pairs"][:12], timeframe=cfg["primary_tf"])
+    yahoo_data  = fetch_all_yahoo(cfg, timeframe=cfg["primary_tf"])
+    market_data = {**kraken_data, **yahoo_data}
     signals     = run_scan(market_data, cfg) if market_data else []
     timestamp   = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-    prompt   = build_briefing_prompt(signals, timestamp)
+    prompt   = build_briefing_prompt(signals, timestamp) + f"\n\nUpcoming high-impact events:\n{events_text}"
     briefing = call_gemini(prompt)
 
     if briefing:
