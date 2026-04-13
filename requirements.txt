@@ -1,5 +1,7 @@
 krakenex==2.1.0
 pandas==2.2.2
-ta==0.11.0
 numpy==1.26.4
 requests==2.31.0
+yfinance==0.2.54
+tweepy==4.14.0
+https://github.com/twopirllc/pandas-ta/archive/refs/heads/development.zip
