@@ -3,4 +3,4 @@ numpy==1.26.4
 requests==2.31.0
 yfinance==0.2.54
 krakenex==2.1.0
-tweepy==4.14.0
+
