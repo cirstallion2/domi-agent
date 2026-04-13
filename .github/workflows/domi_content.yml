@@ -2,9 +2,9 @@ name: DOMI Content Engine
 
 on:
   schedule:
-    - cron: '30 10 * * *'
-    - cron: '30 21 * * *'
-    - cron: '30 2  * * *'
+    - cron: '30 10 * * *' # 5:30 AM Medellin/Tampa
+    - cron: '30 21 * * *' # 4:30 PM Medellin/Tampa
+    - cron: '30 2  * * *' # 9:30 PM Medellin/Tampa
     - cron: '30 13 * * *'
     - cron: '30 16 * * *'
     - cron: '30 19 * * *'
@@ -28,11 +28,11 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-    - name: Install dependencies
+      - name: Install dependencies
         run: |
           pip install pandas==2.2.2 numpy==1.26.4 requests==2.31.0 yfinance==0.2.54 krakenex==2.1.0
-          # Directly install a 3.11 compatible version from the repo's master branch
-          pip install git+https://github.com/twopirllc/pandas-ta.git@master
+          # FORCE INSTALL: Bypass PyPI version locks and Git Auth errors
+          pip install https://github.com/twopirllc/pandas-ta/archive/master.zip
 
       - name: Run DOMI Content Engine
         env:
