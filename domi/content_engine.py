@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-GEMINI_MODEL   = "gemini-2.0-flash"
+GEMINI_MODEL   = "gemini-1.5-flash"
 GEMINI_API_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     + GEMINI_MODEL + ":generateContent"
@@ -116,9 +116,9 @@ def call_gemini(prompt: str, system: str = "", max_tokens: int = 400, temp: floa
         body["system_instruction"] = {"parts": [{"text": system}]}
 
     for attempt in range(4):
-        wait = 20 * (attempt + 1)
+        wait = 60 * (attempt + 1)
         try:
-            time.sleep(5)   # always pause before calling Gemini
+            time.sleep(10)   # always pause before calling Gemini
             resp = requests.post(
                 GEMINI_API_URL,
                 headers={"Content-Type": "application/json"},
@@ -239,7 +239,7 @@ def run_content_engine():
         print("[CONTENT] No story selected. Skipping.")
         return
 
-    time.sleep(10)   # breathe before writing
+    time.sleep(15)   # breathe before writing
 
     if post_mode:
         content = write_market_post(story)
