@@ -16,7 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Clear the Node.js deprecation warnings
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
@@ -32,8 +31,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pandas==2.2.2 numpy==1.26.4 requests==2.31.0 yfinance==0.2.54 krakenex==2.1.0
-          # Using the stable release to avoid GitHub 404 errors
-          pip install pandas-ta==0.3.14b0 
+          # Using the git-pip method to bypass PyPI version mismatches
+          pip install git+https://github.com/twopirllc/pandas-ta.git@development
 
       - name: Run DOMI Content Engine
         env:
