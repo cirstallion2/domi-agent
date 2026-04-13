@@ -2,13 +2,14 @@
 DOMI - Phase 5: Content-to-Conversion Loop
 content_engine.py
 
-Schedule (Medellin time / UTC-5):
-  5:00 AM  (10:00 UTC) - Morning market post
-  4:00 PM  (21:00 UTC) - Afternoon market post  
-  9:00 PM  (02:00 UTC) - Evening market post
-  All other runs       - HeyGen video script
+ONE Gemini call per run to stay within 10 RPM free tier.
+At post hours: outputs market post for X/Telegram
+At other hours: outputs HeyGen video script
 
-Sends to personal Telegram chat for review.
+Post hours (Medellin UTC-5):
+  5:00 AM  = 10:00 UTC
+  4:00 PM  = 21:00 UTC
+  9:00 PM  = 02:00 UTC
 """
 
 import os
@@ -20,34 +21,14 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-GEMINI_MODEL   = "gemini-1.5-flash"
+GEMINI_MODEL   = "gemini-2.0-flash"
 GEMINI_API_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     + GEMINI_MODEL + ":generateContent"
 )
 
 PERSONAL_CHAT_ID = os.environ.get("PERSONAL_CHAT_ID", "7419276203")
-
-CONTENT_VOICE = (
-    "You are DOMI, the AI content engine of SNIPER813PRO by 2much813. "
-    "2much813 is a Market Translator - not a content creator. "
-    "Voice: direct, technical, high-conviction. Short punchy sentences. "
-    "No fluff. No hedging. You front-run the rotation while retail guesses. "
-    "Write for X (Twitter). Hook line first (max 280 chars). "
-    "Then 2-3 lines of technical context - what does this mean for price? "
-    "End with: The Dojo already saw this coming. Tap in to stay ahead. "
-    "Add 3 relevant hashtags at the end only. No hashtags in body."
-)
-
-HEYGEN_VOICE = (
-    "You are DOMI, script writer for 2much813's HeyGen AI avatar videos. "
-    "2much813 is a Market Translator and Sniper in the Dojo. "
-    "Write a 60-90 second video script for an AI avatar to read on camera. "
-    "Structure: Hook (5 sec) | Context (20 sec) | The Edge/Setup (25 sec) | CTA (10 sec). "
-    "Voice: direct, confident, technical but simple enough for retail to follow. "
-    "No bullet points in the script - it must flow naturally when spoken aloud. "
-    "End CTA: Join the Dojo at sniper813alerts on Telegram. Stay sharp. Stay early."
-)
+POST_HOURS_UTC   = {10, 21, 2}   # 5AM, 4PM, 9PM Medellin
 
 RSS_FEEDS = [
     ("CoinDesk",      "https://www.coindesk.com/arc/outboundfeeds/rss/"),
@@ -55,15 +36,6 @@ RSS_FEEDS = [
     ("Decrypt",       "https://decrypt.co/feed"),
     ("Bitcoin Mag",   "https://bitcoinmagazine.com/feed"),
 ]
-
-# Post times in UTC (Medellin is UTC-5)
-POST_HOURS_UTC = [10, 21, 2]   # 5AM, 4PM, 9PM Medellin
-
-
-def is_post_hour() -> bool:
-    """Check if current UTC hour is a content post hour."""
-    current_hour = datetime.now(timezone.utc).hour
-    return current_hour in POST_HOURS_UTC
 
 
 def fetch_rss(url: str, source: str, limit: int = 5) -> list:
@@ -75,15 +47,10 @@ def fetch_rss(url: str, source: str, limit: int = 5) -> list:
         articles = []
         for item in root.findall(".//item")[:limit]:
             title = item.findtext("title", "").strip()
-            desc  = item.findtext("description", "").strip()[:300]
+            desc  = item.findtext("description", "").strip()[:200]
             link  = item.findtext("link", "").strip()
             if title:
-                articles.append({
-                    "title":  title,
-                    "body":   desc,
-                    "source": source,
-                    "url":    link,
-                })
+                articles.append({"title": title, "body": desc, "source": source, "url": link})
         return articles
     except Exception as e:
         print(f"[RSS ERROR] {source}: {e}")
@@ -97,124 +64,90 @@ def fetch_crypto_news() -> list:
         all_articles.extend(articles)
         if articles:
             print(f"[NEWS] {source}: {len(articles)} articles")
-        time.sleep(2)   # stagger RSS fetches
+        time.sleep(1)
     print(f"[NEWS] Total: {len(all_articles)} articles")
     return all_articles
 
 
-def call_gemini(prompt: str, system: str = "", max_tokens: int = 400, temp: float = 0.7) -> str:
+def call_gemini_once(prompt: str) -> str:
+    """Single Gemini call. No retries that burn quota — fail fast and clean."""
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         print("[GEMINI] No API key")
         return ""
-
-    body = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": temp},
-    }
-    if system:
-        body["system_instruction"] = {"parts": [{"text": system}]}
-
-    for attempt in range(4):
-        wait = 60 * (attempt + 1)
-        try:
-            time.sleep(10)   # always pause before calling Gemini
-            resp = requests.post(
-                GEMINI_API_URL,
-                headers={"Content-Type": "application/json"},
-                params={"key": api_key},
-                json=body,
-                timeout=30
-            )
-            if resp.status_code == 429:
-                print(f"[GEMINI] Rate limited. Waiting {wait}s (attempt {attempt+1}/4)...")
-                time.sleep(wait)
-                continue
-            resp.raise_for_status()
-            return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-        except Exception as e:
-            print(f"[GEMINI ERROR] attempt {attempt+1}: {e}")
-            time.sleep(wait)
-
-    return ""
-
-
-def pick_top_story(articles: list) -> dict | None:
-    if not articles:
-        return None
-
-    headlines = "\n".join([
-        f"{i+1}. [{a['source']}] {a['title']}"
-        for i, a in enumerate(articles)
-    ])
-
-    prompt = (
-        "You are a crypto market analyst. "
-        "Pick the ONE most market-moving story from this list. "
-        "Choose based on: macro impact, price action potential, trader relevance. "
-        "Reply with ONLY the number. Nothing else.\n\n"
-        + headlines
-    )
-
-    pick = call_gemini(prompt, max_tokens=5, temp=0.2)
     try:
-        idx = int(pick.strip()) - 1
-        if 0 <= idx < len(articles):
-            print(f"[CONTENT] Top story: {articles[idx]['title'][:70]}...")
-            return articles[idx]
-    except Exception:
-        pass
-    return articles[0]
+        resp = requests.post(
+            GEMINI_API_URL,
+            headers={"Content-Type": "application/json"},
+            params={"key": api_key},
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"maxOutputTokens": 500, "temperature": 0.8},
+            },
+            timeout=30
+        )
+        if resp.status_code == 429:
+            print(f"[GEMINI] Rate limited (429). Will retry next scheduled run.")
+            return ""
+        resp.raise_for_status()
+        return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except Exception as e:
+        print(f"[GEMINI ERROR] {e}")
+        return ""
 
 
-def write_market_post(story: dict) -> str:
-    """Write X/Telegram market post in 2much813 voice."""
-    prompt = (
-        f"News: {story['title']}\n"
-        f"Details: {story['body']}\n"
-        f"Source: {story['source']}\n\n"
-        "Write the 2much813 market post. "
-        "Hook first. Then 2-3 lines on what this means for price action. "
-        "End: The Dojo already saw this coming. Tap in to stay ahead. "
-        "3 hashtags at the end only."
+def build_market_post_prompt(headlines: str) -> str:
+    return (
+        "You are DOMI, AI content engine for SNIPER813PRO by 2much813.\n"
+        "2much813 is a Market Translator. Voice: direct, technical, high-conviction.\n\n"
+        f"Top crypto headlines today:\n{headlines}\n\n"
+        "Pick the most market-moving story and write ONE X/Twitter post.\n"
+        "Format:\n"
+        "- Hook line (punchy, max 280 chars)\n"
+        "- 2-3 lines of what this means for price action\n"
+        "- End with: The Dojo already saw this coming. Tap in to stay ahead.\n"
+        "- 3 hashtags at the very end\n"
+        "No bullet points. Write as flowing text."
     )
-    return call_gemini(prompt, system=CONTENT_VOICE, max_tokens=350, temp=0.8)
 
 
-def write_heygen_script(story: dict) -> str:
-    """Write a 60-90 second HeyGen avatar video script."""
-    prompt = (
-        f"News hook: {story['title']}\n"
-        f"Context: {story['body']}\n\n"
-        "Write a 60-90 second HeyGen video script for the 2much813 AI avatar. "
-        "Structure: Hook | Market Context | The Trading Edge | CTA to join Dojo. "
-        "Written to be spoken naturally on camera. No bullet points."
+def build_heygen_prompt(headlines: str) -> str:
+    return (
+        "You are DOMI, script writer for 2much813's HeyGen AI avatar videos.\n"
+        "2much813 is the Sniper in the Dojo - a Market Translator.\n\n"
+        f"Top crypto headlines today:\n{headlines}\n\n"
+        "Pick the most market-moving story and write a 60-90 second video script.\n"
+        "Structure (label each section):\n"
+        "[HOOK - 5 sec] Attention-grabbing opening line\n"
+        "[CONTEXT - 20 sec] What is happening in the market\n"
+        "[THE EDGE - 25 sec] What smart money is watching, what the setup looks like\n"
+        "[CTA - 10 sec] Join the Dojo at sniper813alerts on Telegram. Stay sharp. Stay early.\n\n"
+        "Written to be spoken naturally on camera. No bullet points in the script."
     )
-    return call_gemini(prompt, system=HEYGEN_VOICE, max_tokens=500, temp=0.75)
 
 
-def send_to_personal(message: str, label: str = "CONTENT DROP") -> bool:
+def send_to_personal(content: str, label: str) -> bool:
     token = os.environ.get("TELEGRAM_TOKEN", "")
     if not token:
         print("[CONTENT] No Telegram token")
         return False
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    full_msg = f"*DOMI {label}*\n_{timestamp}_\n\n{message}"
+    message   = f"*DOMI | {label}*\n_{timestamp}_\n\n{content}"
 
     try:
         resp = requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
             json={
                 "chat_id":    PERSONAL_CHAT_ID,
-                "text":       full_msg,
+                "text":       message,
                 "parse_mode": "Markdown",
                 "disable_web_page_preview": True,
             },
             timeout=10
         )
         resp.raise_for_status()
-        print(f"[CONTENT] Sent to personal chat {PERSONAL_CHAT_ID}")
+        print(f"[CONTENT] Sent to {PERSONAL_CHAT_ID}")
         return True
     except Exception as e:
         print(f"[CONTENT] Send error: {e}")
@@ -222,40 +155,33 @@ def send_to_personal(message: str, label: str = "CONTENT DROP") -> bool:
 
 
 def run_content_engine():
-    now_utc = datetime.now(timezone.utc)
-    print(f"\n[CONTENT] {now_utc.strftime('%Y-%m-%d %H:%M UTC')}")
-
-    post_mode = is_post_hour()
+    now_utc    = datetime.now(timezone.utc)
+    post_mode  = now_utc.hour in POST_HOURS_UTC
     mode_label = "MARKET POST" if post_mode else "HEYGEN SCRIPT"
-    print(f"[CONTENT] Mode: {mode_label}")
+
+    print(f"\n[CONTENT] {now_utc.strftime('%Y-%m-%d %H:%M UTC')} | Mode: {mode_label}")
 
     articles = fetch_crypto_news()
     if not articles:
         print("[CONTENT] No news fetched. Skipping.")
         return
 
-    story = pick_top_story(articles)
-    if not story:
-        print("[CONTENT] No story selected. Skipping.")
-        return
+    # Build compact headline list for the prompt
+    headlines = "\n".join([
+        f"- [{a['source']}] {a['title']}"
+        for a in articles[:10]
+    ])
 
-    time.sleep(15)   # breathe before writing
-
-    if post_mode:
-        content = write_market_post(story)
-        label = "MARKET POST - ready for X"
-    else:
-        content = write_heygen_script(story)
-        label = "HEYGEN SCRIPT - ready for avatar"
+    # ONE Gemini call
+    prompt  = build_market_post_prompt(headlines) if post_mode else build_heygen_prompt(headlines)
+    content = call_gemini_once(prompt)
 
     if not content:
-        print("[CONTENT] No content generated. Skipping.")
+        print("[CONTENT] No content generated.")
         return
 
-    print(f"\n[CONTENT] Preview:\n{content[:200]}...\n")
-
-    source_line = f"Source: {story['source']} | {story['url']}\n\n"
-    send_to_personal(source_line + content, label)
+    print(f"\n[CONTENT] Preview:\n{content[:300]}...\n")
+    send_to_personal(content, mode_label)
 
 
 if __name__ == "__main__":
