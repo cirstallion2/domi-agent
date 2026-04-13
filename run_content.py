@@ -23,7 +23,7 @@ def fetch_x_intel(token):
     return "X Research: Trending data temporarily unavailable."
 
 def run_engine():
-    print("🚀 SNIPER813PRO Content Engine: Active")
+    print("🚀 Content Engine: Active")
     
     # 1. Gather RSS News
     feeds = ["https://www.coindesk.com/arc/outboundfeeds/rss/", "https://cointelegraph.com/rss"]
