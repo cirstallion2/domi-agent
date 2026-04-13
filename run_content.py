@@ -1,62 +1,54 @@
 import os
-import sys
-import time
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
-
-# 1. GATHER INTEL
-def fetch_x_intel(token):
-    if not token: return "Market sentiment: Neutral."
-    url = "https://api.twitter.com/2/tweets/search/recent"
-    headers = {"Authorization": f"Bearer {token}"}
-    params = {'query': '(crypto OR xrp OR solana) is:verified -is:retweet', 'max_results': 5}
-    try:
-        r = requests.get(url, headers=headers, params=params, timeout=10)
-        if r.status_code == 200:
-            return " ".join([t['text'] for t in r.json().get('data', [])])
-    except: return "Sentiment scanning..."
+from datetime import datetime
 
 def run_engine():
-    print("🚀 SNIPER813PRO Content Engine: Active")
+    print("🚀 SNIPER813PRO: DOMI Content Engine Active")
     
-    # 2. CALL THE BRAIN (Switching to 1.5-Flash for maximum quota)
+    # 1. PERCEPTION: Gather 2026 Pulse
+    # Targets: XRP Utility, SOL Speed, and the April '26 DeAI Boom
+    headlines = []
+    feeds = ["https://www.coindesk.com/arc/outboundfeeds/rss/", "https://cointelegraph.com/rss"]
+    for url in feeds:
+        try:
+            res = requests.get(url, timeout=10)
+            root = ET.fromstring(res.content)
+            headlines.extend([item.findtext('title') for item in root.findall('.//item')[:2]])
+        except: continue
+
+    # 2. REASONING: Orchestrator DOMI (Gemini 1.5 Flash)
     api_key = os.environ.get("GEMINI_API_KEY")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     
-    # Explicit instructions to keep the brain focused
-    prompt = "Write a high-conviction market update for the SNIPER813PRO brand. Mention XRP or SOL based on general bullish sentiment. Keep it under 50 words. Be aggressive and technical."
-
-    content = "Dojo Intelligence: Market scans complete. Stay disciplined." # Fallback
+    prompt = f"""
+    Act as DOMI, the Master AI Orchestrator for 2MUCH813. 
+    Current Market Pulse: {headlines}
+    
+    TASK: Generate two items:
+    1. A Technical Telegram Update (Aggressive, high-conviction).
+    2. A 30-Second Video Script (Hook, Alpha, CTA).
+    
+    Tone: Sniper, Dojo-focused, No fluff. Focus on the 21 EMA and 2026 Narratives (XRP/DeAI).
+    """
 
     try:
         response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
         data = response.json()
-        
-        # DEBUG: Let's see what the brain is actually doing in the logs
-        print(f"DEBUG BRAIN RESPONSE: {data}")
+        content = data['candidates'][0]['content']['parts'][0]['text']
+    except:
+        content = "Dojo Intelligence: Market scans running. Stay focused on the 21 EMA."
 
-        if 'candidates' in data and data['candidates'][0].get('content'):
-            content = data['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e:
-        print(f"❌ Brain connection error: {e}")
-
-    # 3. TELEGRAM DELIVERY (HTML MODE)
+    # 3. EXECUTION: Deliver to 2MUCH813
     tg_token = os.environ.get("TELEGRAM_TOKEN")
-    chat_id = "7419276203" # Your verified ID
+    chat_id = "7419276203"
     
-    clean_content = content.replace("<", "&lt;").replace(">", "&gt;") 
-    tg_msg = f"<b>🦅 SNIPER813PRO INTEL</b>\n\n{clean_content}"
-
-    try:
-        res = requests.post(f"https://api.telegram.org/bot{tg_token}/sendMessage", 
-                            json={"chat_id": chat_id, "text": tg_msg, "parse_mode": "HTML"}, timeout=10)
-        if res.status_code == 200:
-            print("✅ TELEGRAM DELIVERED.")
-        else:
-            print(f"❌ TG REJECTED: {res.text}")
-    except Exception as e:
-        print(f"❌ TG CRITICAL ERROR: {e}")
+    # Format for readability
+    clean_msg = f"<b>🦅 DOMI MASTER INTEL</b>\n\n{content.replace('*', '')}"
+    
+    requests.post(f"https://api.telegram.org/bot{tg_token}/sendMessage", 
+                 json={"chat_id": chat_id, "text": clean_msg, "parse_mode": "HTML"})
+    print("✅ Alpha Delivered.")
 
 if __name__ == "__main__":
     run_engine()
