@@ -28,11 +28,11 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install dependencies
+    - name: Install dependencies
         run: |
           pip install pandas==2.2.2 numpy==1.26.4 requests==2.31.0 yfinance==0.2.54 krakenex==2.1.0
-          # Force install the stable dev version without git clone
-          pip install pandas-ta --pre
+          # Directly install a 3.11 compatible version from the repo's master branch
+          pip install git+https://github.com/twopirllc/pandas-ta.git@master
 
       - name: Run DOMI Content Engine
         env:
