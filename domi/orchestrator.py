@@ -3,62 +3,65 @@ import json
 import krakenex
 import pandas as pd
 from domi.signal_engine import run_scan
-from domi.delivery import send_telegram_signal # We'll build this next
+
+def load_config():
+    """Load the watchlist and strategy settings."""
+    config_path = "config/watchlist.json"
+    if not os.path.exists(config_path):
+        # Default fallback if file is missing
+        return {
+            "pairs": ["XRP/USD", "SOL/USD", "BTC/USD"],
+            "ema_periods": [9, 20, 200],
+            "keltner_period": 20,
+            "keltner_atr_mult": 2.0,
+            "stoch_k": 14,
+            "stoch_d": 3,
+            "rsi_period": 14
+        }
+    with open(config_path, "r") as f:
+        return json.load(f)
 
 def run_scan_mode(cfg):
-    print("🦅 SNIPER813PRO: Starting Market Scan...")
+    print("🦅 SNIPER813PRO: Initializing Dojo Scan...")
     
-    # 1. Connect to Kraken
+    # Connect to Kraken
     k = krakenex.API()
     k.key = os.getenv("KRAKEN_API_KEY")
     k.secret = os.getenv("KRAKEN_PRIVACY_KEY")
 
     market_data = {}
-    pairs = cfg["pairs"] # e.g., ["XRP/USD", "SOL/USD", "BTC/USD"]
-
-    # 2. Perception: Fetch OHLC Data
-    for p in pairs:
+    
+    # 1. Perception: Fetching 1H Candles
+    for pair in cfg.get("pairs", []):
         try:
-            # Fetch 1H intervals (60 mins)
-            res = k.query_public('OHLC', {'pair': p, 'interval': 60})
-            if not res.get('error'):
-                pair_key = list(res['result'].keys())[0]
-                raw_data = res['result'][pair_key]
-                df = pd.DataFrame(raw_data, columns=['time', 'open', 'high', 'low', 'close', 'vwap', 'vol', 'count'])
-                df['close'] = df['close'].astype(float)
-                df['high'] = df['high'].astype(float)
-                df['low'] = df['low'].astype(float)
-                market_data[p] = df
+            # interval 60 = 1 Hour
+            res = k.query_public('OHLC', {'pair': pair, 'interval': 60})
+            
+            if res.get('error'):
+                print(f"❌ Kraken Error for {pair}: {res['error']}")
+                continue
+                
+            pair_key = list(res['result'].keys())[0]
+            raw_ticks = res['result'][pair_key]
+            
+            # Convert to DataFrame
+            df = pd.DataFrame(raw_ticks, columns=[
+                'time', 'open', 'high', 'low', 'close', 'vwap', 'vol', 'count'
+            ])
+            
+            # Clean numeric types
+            for col in ['open', 'high', 'low', 'close', 'vol']:
+                df[col] = df[col].astype(float)
+            
+            market_data[pair] = df
+            print(f"✅ Data retrieved for {pair}")
+            
         except Exception as e:
-            print(f"❌ Error fetching {p}: {e}")
+            print(f"❌ Failed to fetch {pair}: {e}")
 
-    # 3. Reasoning: Score Signals
-    signals = run_scan(market_data, cfg)
-
-    # 4. Execution: Deliver Gold Signals
-    for sig in signals:
-        if sig.grade == "GOLD":
-            send_telegram_signal(sig) # Blasts to your Elite channel
-            log_signal(sig) # Saves to signals_log.json for the 'Receipts' engine
-
-def log_signal(sig):
-    log_file = "data/signals_log.json"
-    os.makedirs("data", exist_ok=True)
-    new_data = {
-        "timestamp": str(pd.Timestamp.now()),
-        "pair": sig.pair,
-        "direction": sig.direction,
-        "price": sig.price,
-        "score": sig.score
-    }
-    
-    # Load existing or create new
-    if os.path.exists(log_file):
-        with open(log_file, "r") as f:
-            data = json.load(f)
+    # 2. Reasoning: Pass to Signal Engine
+    if market_data:
+        signals = run_scan(market_data, cfg)
+        # Signals are now scored 0-6 by your signal_engine.py
     else:
-        data = []
-    
-    data.append(new_data)
-    with open(log_file, "w") as f:
-        json.dump(data, f, indent=4)
+        print("⚠️ No market data available to scan.")
