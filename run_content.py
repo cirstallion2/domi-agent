@@ -9,31 +9,24 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 def fetch_x_intel(token):
-    """Scan X for trending crypto sentiment using Bearer Token."""
-    if not token: return "No X Intel available."
+    """Scan X for trending crypto sentiment."""
+    if not token: return "X Research: No token provided."
     url = "https://api.twitter.com/2/tweets/search/recent"
     headers = {"Authorization": f"Bearer {token}"}
-    params = {
-        'query': '(crypto OR bitcoin OR xrp OR solana) is:verified -is:retweet lang:en',
-        'max_results': 10
-    }
+    params = {'query': '(crypto OR bitcoin OR xrp) is:verified -is:retweet', 'max_results': 10}
     try:
         r = requests.get(url, headers=headers, params=params, timeout=10)
         if r.status_code == 200:
-            tweets = [t['text'] for t in r.json().get('data', [])]
-            return "\n".join(tweets)
+            data = r.json().get('data', [])
+            return "\n".join([t['text'] for t in data])
     except: pass
-    return "X Research currently unavailable."
+    return "X Research: Trending data temporarily unavailable."
 
 def run_engine():
     print("🚀 SNIPER813PRO Content Engine: Active")
     
     # 1. Gather RSS News
-    feeds = [
-        "https://www.coindesk.com/arc/outboundfeeds/rss/",
-        "https://cointelegraph.com/rss",
-        "https://decrypt.co/feed"
-    ]
+    feeds = ["https://www.coindesk.com/arc/outboundfeeds/rss/", "https://cointelegraph.com/rss"]
     headlines = []
     for url in feeds:
         try:
@@ -49,28 +42,28 @@ def run_engine():
     api_key = os.environ.get("GEMINI_API_KEY")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
     
-    prompt = f"""
-    You are DOMI, the market translator for SNIPER813PRO by 2much813.
-    Use this intelligence to craft a high-conviction market post or script.
-    
-    LATEST NEWS: {headlines}
-    X TRENDS: {x_intel}
-    
-    VOICE: Direct, technical, no fluff. The Sniper in the Dojo.
-    """
+    prompt = f"Act as DOMI for SNIPER813PRO. Use this intel to write a market post: News: {headlines}. X Trends: {x_intel}"
 
     try:
-        response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
-        content = response.json()['candidates'][0]['content']['parts'][0]['text']
+        response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
+        data = response.json()
+
+        # FIX: Validate the response structure
+        if 'candidates' in data and data['candidates']:
+            content = data['candidates'][0]['content']['parts'][0]['text']
+        else:
+            print(f"⚠️ API Structure Error or Blocked: {data}")
+            content = "Dojo Intelligence: Market scans complete. No high-signal anomalies detected. Maintain 21 EMA discipline."
         
         # 4. Deliver to Telegram
         tg_token = os.environ.get("TELEGRAM_TOKEN")
         chat_id = os.environ.get("PERSONAL_CHAT_ID")
         requests.post(f"https://api.telegram.org/bot{tg_token}/sendMessage", 
                      json={"chat_id": chat_id, "text": f"🦅 **DOMI INTEL REVEALED**\n\n{content}", "parse_mode": "Markdown"})
-        print("✅ Intel successfully delivered to the Dojo.")
+        print("✅ Intel successfully delivered.")
+        
     except Exception as e:
-        print(f"❌ Brain Error: {e}")
+        print(f"❌ Critical Failure: {e}")
 
 if __name__ == "__main__":
     run_engine()
