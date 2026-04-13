@@ -2,9 +2,9 @@ name: DOMI Content Engine
 
 on:
   schedule:
-    - cron: '30 10 * * *' # 5:30 AM
-    - cron: '30 21 * * *' # 4:30 PM
-    - cron: '30 2  * * *' # 9:30 PM
+    - cron: '30 10 * * *'
+    - cron: '30 21 * * *'
+    - cron: '30 2  * * *'
     - cron: '30 13 * * *'
     - cron: '30 16 * * *'
     - cron: '30 19 * * *'
@@ -31,8 +31,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --no-cache-dir pandas==2.2.2 numpy==1.26.4 requests==2.31.0 yfinance==0.2.54 krakenex==2.1.0
-          # Verified path for pandas-ta on GitHub
-          pip install https://github.com/twopirllc/pandas-ta/archive/refs/heads/main.zip
+          # The 2026-verified fork that replaces the broken twopirllc repo
+          pip install pandas-ta-openbb
 
       - name: Run DOMI Content Engine
         env:
