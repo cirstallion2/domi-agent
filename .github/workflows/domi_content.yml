@@ -2,9 +2,9 @@ name: DOMI Content Engine
 
 on:
   schedule:
-    - cron: '30 10 * * *' # 5:30 AM Medellin
-    - cron: '30 21 * * *' # 4:30 PM Medellin
-    - cron: '30 2  * * *' # 9:30 PM Medellin
+    - cron: '30 10 * * *' # 5:30 AM Medellin/Tampa
+    - cron: '30 21 * * *' # 4:30 PM Medellin/Tampa
+    - cron: '30 2  * * *' # 9:30 PM Medellin/Tampa
     - cron: '30 13 * * *'
     - cron: '30 16 * * *'
     - cron: '30 19 * * *'
@@ -15,6 +15,9 @@ jobs:
   content:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Clear the Node.js deprecation warnings
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout repo
@@ -29,7 +32,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pandas==2.2.2 numpy==1.26.4 requests==2.31.0 yfinance==0.2.54 krakenex==2.1.0
-          pip install https://github.com/twopirllc/pandas-ta/archive/refs/heads/development.zip
+          # Using the stable release to avoid GitHub 404 errors
+          pip install pandas-ta==0.3.14b0 
 
       - name: Run DOMI Content Engine
         env:
