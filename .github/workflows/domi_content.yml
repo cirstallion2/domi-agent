@@ -31,9 +31,9 @@ jobs:
 
       - name: Run DOMI Content Engine
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          TELEGRAM_TOKEN:    ${{ secrets.TELEGRAM_TOKEN }}
-          PERSONAL_CHAT_ID:  "7419276203"
-          X_BEARER_TOKEN:    ${{ secrets.X_BEARER_TOKEN }}
-          PYTHONPATH:        ${{ github.workspace }}
+          GEMINI_API_KEY:  ${{ secrets.GEMINI_CONTENT_KEY }}
+          TELEGRAM_TOKEN:  ${{ secrets.TELEGRAM_TOKEN }}
+          PERSONAL_CHAT_ID: "7419276203"
+          X_BEARER_TOKEN:  ${{ secrets.X_BEARER_TOKEN }}
+          PYTHONPATH:      ${{ github.workspace }}
         run: python run_content.py
